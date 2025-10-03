@@ -23,24 +23,31 @@ RUN pip install --no-cache-dir \
         requests \
         beautifulsoup4
 
-# Install Ollama (interactive install, will complete at runtime)
-RUN curl -k -fsSL https://ollama.ai/install.sh | sh
+# Install Ollama
+RUN curl -fsSL https://ollama.ai/install.sh | sh
 
-# Add Ollama binary to PATH
-ENV PATH="/usr/local/ollama:$PATH"
+# Pre-pull the model during build (this happens at image creation time)
+# Start server, pull model, then stop - all in one RUN command
+RUN ollama serve & \
+    SERVER_PID=$! && \
+    sleep 5 && \
+    echo "📦 Pulling llama3 model during image build..." && \
+    ollama pull llama3 && \
+    kill $SERVER_PID && \
+    wait $SERVER_PID 2>/dev/null || true
 
 # Set working directory
 WORKDIR /sdverse
 
-# Copy application
+# Copy application files
 COPY sdverse_products.py .
-
-# Copy start script
 COPY scripts/start.sh .
 
-# Make sure it’s executable
+# Make start script executable
 RUN chmod +x start.sh
+
+# Expose Ollama server port (optional, for debugging)
+EXPOSE 11434
 
 # Default command: run start.sh
 CMD ["./start.sh"]
-# CMD ["/bin/bash"]
